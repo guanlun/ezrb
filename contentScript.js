@@ -33,26 +33,40 @@ function extractDiff(diffTable) {
       const leftLine = line.querySelector('td.l');
       const rightLine = line.querySelector('td.r');
 
+      const [leftLineNumber, rightLineNumber] = Array.prototype.map.call(line.querySelectorAll('th'), el => el.textContent);
+
       let leftContent, rightContent;
 
       switch (sectionType) {
         case 'replace':
         case 'equal':
           leftContent = leftLine.querySelector('pre').textContent;
-          leftLines.push(leftContent.replace(/\n/g, ''));
+          leftLines.push({
+            number: leftLineNumber.replace(/[\s\n]/g, ''),
+            content: leftContent.replace(/\n/g, '')
+          });
 
           rightContent = rightLine.querySelector('pre').textContent;
-          rightLines.push(rightContent.replace(/\n/g, ''));
+          rightLines.push({
+            number: rightLineNumber.replace(/[\s\n]/g, ''),
+            content: rightContent.replace(/\n/g, '')
+          });
         break;
 
         case 'insert':
           rightContent = rightLine.querySelector('pre').textContent;
-          rightLines.push(rightContent.replace(/\n/g, ''));
+          rightLines.push({
+            number: rightLineNumber.replace(/[\s\n]/g, ''),
+            content: rightContent.replace(/\n/g, '')
+          });
         break;
 
         case 'delete':
           leftContent = leftLine.querySelector('pre').textContent;
-          leftLines.push(leftContent.replace(/\n/g, ''));
+          leftLines.push({
+            number: leftLineNumber.replace(/[\s\n]/g, ''),
+            content: leftContent.replace(/\n/g, '')
+          });
         break;
       }
     }
@@ -62,6 +76,7 @@ function extractDiff(diffTable) {
   // We changed the way we push lines to leftLines and rightLines, messing up the line indices
 
   return {
+    filename: diffTable.querySelector('.filename-row').textContent,
     left: leftLines,
     right: rightLines,
   };
@@ -97,9 +112,9 @@ function computeDiff(fileComparison) {
 
   for (let leftIdx = 1; leftIdx < leftLineCount + 1; leftIdx++) {
     for (let rightIdx = 1; rightIdx < rightLineCount + 1; rightIdx++) {
-      const isSameLine = leftLines[leftIdx - 1] === rightLines[rightIdx - 1];
+      const isSameLine = leftLines[leftIdx - 1].content === rightLines[rightIdx - 1].content;
 
-      const lineDiff = lineDifference(leftLines[leftIdx - 1], rightLines[rightIdx - 1]);
+      const lineDiff = lineDifference(leftLines[leftIdx - 1].content, rightLines[rightIdx - 1].content);
 
       const lineChangeResult = dpMtx[leftIdx - 1][rightIdx - 1];
 
@@ -229,10 +244,14 @@ function createDisplayRow(changeType, changeValue) {
   changeTypeDisplay.innerHTML = changeType;
   lineDisplay.appendChild(changeTypeDisplay);
 
+  const lineNumberDisplay = document.createElement('td');
+  lineNumberDisplay.innerHTML = changeValue.number;
+  lineDisplay.appendChild(lineNumberDisplay);
+
   const changeValueDisplay = document.createElement('td');
 
   if (changeValue) {
-    changeValueDisplay.innerHTML = changeValue
+    changeValueDisplay.innerHTML = changeValue.content
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
   } else {
@@ -262,7 +281,6 @@ function displayChanges(comparison, changes) {
 
   const modal = document.createElement('div', 'diff-modal');
   modal.style.backgroundColor = 'white';
-  modal.style.width = '90%';
   modal.style.height = '90%';
   modal.style.overflowY = 'scroll';
   modal.style.fontFamily = 'monospace';
@@ -272,6 +290,10 @@ function displayChanges(comparison, changes) {
     evt.stopPropagation();
   });
   modalLayer.appendChild(modal);
+
+  const filenameDisplay = document.createElement('div');
+  filenameDisplay.innerHTML = comparison.filename;
+  modal.appendChild(filenameDisplay);
 
   const diffDisplayTable = document.createElement('table');
   modal.appendChild(diffDisplayTable);
@@ -284,11 +306,11 @@ function displayChanges(comparison, changes) {
 
     switch (change.editType) {
       case 'NO_CHANGE':
-        diffDisplayTable.appendChild(createDisplayRow('', comparison.right[change.currLineIdx]));
+        diffDisplayTable.appendChild(createDisplayRow('', comparison.right[change.currLineIdx] || '&nbsp;'));
         break;
       case 'LINE_CHANGE':
-        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx]));
-        continuousLineChangeBuffer.push(createDisplayRow('+', comparison.right[change.currLineIdx]));
+        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx] || '&nbsp;'));
+        continuousLineChangeBuffer.push(createDisplayRow('+', comparison.right[change.currLineIdx] || '&nbsp;'));
 
         if (nextChange.editType !== 'LINE_CHANGE') {
           while (continuousLineChangeBuffer.length > 0) {
@@ -298,10 +320,10 @@ function displayChanges(comparison, changes) {
 
         break;
       case 'INSERTION':
-        diffDisplayTable.appendChild(createDisplayRow('+', comparison.right[change.currLineIdx]));
+        diffDisplayTable.appendChild(createDisplayRow('+', comparison.right[change.currLineIdx] || '&nbsp;'));
         break;
       case 'DELETION':
-        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx]));
+        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx] || '&nbsp;'));
         break;
     }
   }
@@ -349,3 +371,4 @@ if (
 ) {
   addPrettifyButtonsWhenReady();
 }
+
