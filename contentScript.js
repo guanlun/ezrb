@@ -51,7 +51,7 @@ function extractDiff(diffTable) {
       const leftLine = line.querySelector('td.l');
       const rightLine = line.querySelector('td.r');
 
-      const [leftLineNumber, rightLineNumber] = Array.prototype.map.call(line.querySelectorAll('th'), el => el.textContent);
+      const [leftLineNumber, rightLineNumber] = Array.prototype.map.call(line.querySelectorAll('th'), el => parseInt(el.textContent.replace(/[\s\n]/g, '')));
 
       let leftContent, rightContent;
 
@@ -60,13 +60,13 @@ function extractDiff(diffTable) {
         case 'equal':
           leftContent = leftLine.querySelector('pre').textContent;
           dividedDiffBlock.leftLines.push({
-            number: leftLineNumber.replace(/[\s\n]/g, ''),
+            number: leftLineNumber,
             content: leftContent.replace(/\n/g, '')
           });
 
           rightContent = rightLine.querySelector('pre').textContent;
           dividedDiffBlock.rightLines.push({
-            number: rightLineNumber.replace(/[\s\n]/g, ''),
+            number: rightLineNumber,
             content: rightContent.replace(/\n/g, '')
           });
         break;
@@ -74,7 +74,7 @@ function extractDiff(diffTable) {
         case 'insert':
           rightContent = rightLine.querySelector('pre').textContent;
           dividedDiffBlock.rightLines.push({
-            number: rightLineNumber.replace(/[\s\n]/g, ''),
+            number: rightLineNumber,
             content: rightContent.replace(/\n/g, '')
           });
         break;
@@ -82,12 +82,17 @@ function extractDiff(diffTable) {
         case 'delete':
           leftContent = leftLine.querySelector('pre').textContent;
           dividedDiffBlock.leftLines.push({
-            number: leftLineNumber.replace(/[\s\n]/g, ''),
+            number: leftLineNumber,
             content: leftContent.replace(/\n/g, '')
           });
         break;
       }
     }
+  }
+
+  // push remaining diff block, if there is one
+  if (dividedDiffBlock.rightLines.length > 0) {
+    dividedDiffBlocks.push(dividedDiffBlock);
   }
 
   // WHAT'S WRONG
@@ -311,6 +316,7 @@ function displayChanges(processedFileData, totalChanges) {
   modal.style.fontFamily = 'monospace';
   modal.style.fontSize = '8pt';
   modal.style.whiteSpace = 'pre-wrap';
+  modal.style.padding = '10px';
   modal.addEventListener('click', evt => {
     evt.stopPropagation();
   });
@@ -319,6 +325,7 @@ function displayChanges(processedFileData, totalChanges) {
   const filenameDisplay = document.createElement('div');
   filenameDisplay.innerHTML = processedFileData.filename;
   filenameDisplay.style.fontWeight = 'bold';
+  filenameDisplay.style.paddingBottom = '10px';
   modal.appendChild(filenameDisplay);
 
   const diffDisplayTable = document.createElement('table');
@@ -362,7 +369,7 @@ function displayChanges(processedFileData, totalChanges) {
       const nextFileDataBlock = processedFileData.dividedDiffBlocks[blockIdx + 1];
 
       // subtract last line number of current block from first line number of next block to get the number of omitted lines
-      const omittedLinesCount = parseInt(nextFileDataBlock.rightLines[0].number) - parseInt(fileDataBlock.rightLines[fileDataBlock.rightLines.length - 1].number) - 1;
+      const omittedLinesCount = nextFileDataBlock.rightLines[0].number - fileDataBlock.rightLines[fileDataBlock.rightLines.length - 1].number - 1;
 
       const blockDividerRow = document.createElement('tr');
       const blockDividerCell = document.createElement('td');
@@ -439,32 +446,39 @@ window.addEventListener('scroll', evt => {
     const diffTable = diffTables[diffTableIdx];
     const boundingRect = diffTable.getBoundingClientRect();
 
-    if (boundingRect.y < windowHeight - 100 && boundingRect.bottom > 0) {
-      console.log(diffTableIdx, boundingRect)
-      let prettifyButton = diffTable.querySelector('.prettify-button');
+    let prettifyButton = diffTable.querySelector('.prettify-button');
+
+    if (boundingRect.y < windowHeight - 130 && boundingRect.bottom > 0) {
       if (!prettifyButton) {
         prettifyButton = document.createElement('button');
         prettifyButton.className = 'prettify-button';
-        prettifyButton.style.position = 'absolute';
-        prettifyButton.style.left = '20px';
-        prettifyButton.style.width = '120px';
+
+        prettifyButton.style.width = '100px';
         prettifyButton.style.height = '30px';
         prettifyButton.style.borderRadius = '15px';
         prettifyButton.style.fontSize = '15px';
         prettifyButton.style.backgroundColor = '#0084bf';
         prettifyButton.style.color = 'white';
-        prettifyButton.style.opacity = 0.6;
         prettifyButton.style.outline = 'none';
         prettifyButton.innerHTML = 'Prettify';
         prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
         diffTable.appendChild(prettifyButton);
       }
 
+      prettifyButton.style.visibility = 'visible';
+
       if (boundingRect.bottom > windowHeight) {
-        prettifyButton.style.top = `${windowHeight - boundingRect.y - 45}px`;
+        // prettifyButton.style.top = `${windowHeight - boundingRect.y - 45}px`;
+        prettifyButton.style.position = 'fixed';
+        prettifyButton.style.bottom = '40px';
+        prettifyButton.style.left = '-20px';
       } else {
-        prettifyButton.style.top = `${boundingRect.height - 45}px`;
+        // prettifyButton.style.top = `${boundingRect.height - 45}px`;
+        prettifyButton.style.position = 'absolute';
+        prettifyButton.style.left = '-36px';
       }
+    } else {
+      prettifyButton.style.visibility = 'hidden';
     }
   }
 })
