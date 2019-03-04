@@ -23,11 +23,29 @@ function extractDiff(diffTable) {
   //   '  as |dropdown|}}',
   // ];
 
-  const leftLines = [];
-  const rightLines = [];
+  // each dividedDiffBlock is a block that's separated by omitted common lines (e.g. +20 lines)
+  // here we add each block separated to the overall diff blocks array
+  const dividedDiffBlocks = [];
+
+  let dividedDiffBlock = {
+    leftLines: [],
+    rightLines: [],
+  }
+
+  // const leftLines = [];
+  // const rightLines = [];
 
   for (const diffSection of diffTable.getElementsByTagName('tbody')) {
     const sectionType = diffSection.className;
+
+    if (sectionType === 'diff-header' && dividedDiffBlock.rightLines.length > 0) {
+      dividedDiffBlocks.push(dividedDiffBlock);
+
+      dividedDiffBlock = {
+        leftLines: [],
+        rightLines: [],
+      };
+    }
 
     for (const line of diffSection.getElementsByTagName('tr')) {
       const leftLine = line.querySelector('td.l');
@@ -41,13 +59,13 @@ function extractDiff(diffTable) {
         case 'replace':
         case 'equal':
           leftContent = leftLine.querySelector('pre').textContent;
-          leftLines.push({
+          dividedDiffBlock.leftLines.push({
             number: leftLineNumber.replace(/[\s\n]/g, ''),
             content: leftContent.replace(/\n/g, '')
           });
 
           rightContent = rightLine.querySelector('pre').textContent;
-          rightLines.push({
+          dividedDiffBlock.rightLines.push({
             number: rightLineNumber.replace(/[\s\n]/g, ''),
             content: rightContent.replace(/\n/g, '')
           });
@@ -55,7 +73,7 @@ function extractDiff(diffTable) {
 
         case 'insert':
           rightContent = rightLine.querySelector('pre').textContent;
-          rightLines.push({
+          dividedDiffBlock.rightLines.push({
             number: rightLineNumber.replace(/[\s\n]/g, ''),
             content: rightContent.replace(/\n/g, '')
           });
@@ -63,7 +81,7 @@ function extractDiff(diffTable) {
 
         case 'delete':
           leftContent = leftLine.querySelector('pre').textContent;
-          leftLines.push({
+          dividedDiffBlock.leftLines.push({
             number: leftLineNumber.replace(/[\s\n]/g, ''),
             content: leftContent.replace(/\n/g, '')
           });
@@ -76,15 +94,16 @@ function extractDiff(diffTable) {
   // We changed the way we push lines to leftLines and rightLines, messing up the line indices
 
   return {
-    filename: diffTable.querySelector('.filename-row').textContent,
-    left: leftLines,
-    right: rightLines,
+    filename: diffTable.querySelector('.filename-row').textContent.replace(/[\s\n]/g, ''),
+    dividedDiffBlocks
+    // left: leftLines,
+    // right: rightLines,
   };
 }
 
 function computeDiff(fileComparison) {
-  const leftLines = fileComparison.left;
-  const rightLines = fileComparison.right;
+  const leftLines = fileComparison.leftLines;
+  const rightLines = fileComparison.rightLines;
 
   const leftLineCount = leftLines.length;
   const rightLineCount = rightLines.length;
@@ -263,7 +282,13 @@ function createDisplayRow(changeType, changeValue) {
   return lineDisplay;
 }
 
-function displayChanges(comparison, changes) {
+/**
+ * Create DOM elements to display the computed changesd
+ * @param {Object} processedFileData contains the filename and file lines (line number and content) divided into blocks
+ * @param {Array} totalChanges contains the change descriptors (change type, indices)
+ */
+function displayChanges(processedFileData, totalChanges) {
+
   const modalLayer = document.createElement('div', 'diff-modal-layer');
   modalLayer.style.position = 'fixed';
   modalLayer.style.top = '0';
@@ -292,7 +317,8 @@ function displayChanges(comparison, changes) {
   modalLayer.appendChild(modal);
 
   const filenameDisplay = document.createElement('div');
-  filenameDisplay.innerHTML = comparison.filename;
+  filenameDisplay.innerHTML = processedFileData.filename;
+  filenameDisplay.style.fontWeight = 'bold';
   modal.appendChild(filenameDisplay);
 
   const diffDisplayTable = document.createElement('table');
@@ -300,31 +326,52 @@ function displayChanges(comparison, changes) {
 
   const continuousLineChangeBuffer = [];
 
-  for (let changeIdx = 0; changeIdx < changes.length; changeIdx++) {
-    const change = changes[changeIdx];
-    const nextChange = changeIdx < changes.length - 1 ? changes[changeIdx + 1] : {};
+  for (let blockIdx = 0; blockIdx < totalChanges.length; blockIdx++) {
+    const changesInBlock = totalChanges[blockIdx];
+    const fileDataBlock = processedFileData.dividedDiffBlocks[blockIdx];
 
-    switch (change.editType) {
-      case 'NO_CHANGE':
-        diffDisplayTable.appendChild(createDisplayRow('', comparison.right[change.currLineIdx] || '&nbsp;'));
-        break;
-      case 'LINE_CHANGE':
-        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx] || '&nbsp;'));
-        continuousLineChangeBuffer.push(createDisplayRow('+', comparison.right[change.currLineIdx] || '&nbsp;'));
+    for (let changeIdx = 0; changeIdx < changesInBlock.length; changeIdx++) {
+      const change = changesInBlock[changeIdx];
+      const nextChange = changeIdx < changesInBlock.length - 1 ? changesInBlock[changeIdx + 1] : {};
 
-        if (nextChange.editType !== 'LINE_CHANGE') {
-          while (continuousLineChangeBuffer.length > 0) {
-            diffDisplayTable.appendChild(continuousLineChangeBuffer.shift());
+      switch (change.editType) {
+        case 'NO_CHANGE':
+          diffDisplayTable.appendChild(createDisplayRow('', fileDataBlock.rightLines[change.currLineIdx] || '&nbsp;'));
+          break;
+        case 'LINE_CHANGE':
+          diffDisplayTable.appendChild(createDisplayRow('-', fileDataBlock.leftLines[change.prevLineIdx] || '&nbsp;'));
+          continuousLineChangeBuffer.push(createDisplayRow('+', fileDataBlock.rightLines[change.currLineIdx] || '&nbsp;'));
+
+          if (nextChange.editType !== 'LINE_CHANGE') {
+            while (continuousLineChangeBuffer.length > 0) {
+              diffDisplayTable.appendChild(continuousLineChangeBuffer.shift());
+            }
           }
-        }
 
-        break;
-      case 'INSERTION':
-        diffDisplayTable.appendChild(createDisplayRow('+', comparison.right[change.currLineIdx] || '&nbsp;'));
-        break;
-      case 'DELETION':
-        diffDisplayTable.appendChild(createDisplayRow('-', comparison.left[change.prevLineIdx] || '&nbsp;'));
-        break;
+          break;
+        case 'INSERTION':
+          diffDisplayTable.appendChild(createDisplayRow('+', fileDataBlock.rightLines[change.currLineIdx] || '&nbsp;'));
+          break;
+        case 'DELETION':
+          diffDisplayTable.appendChild(createDisplayRow('-', fileDataBlock.leftLines[change.prevLineIdx] || '&nbsp;'));
+          break;
+      }
+    }
+
+    if (blockIdx < totalChanges.length - 1) {
+      const nextFileDataBlock = processedFileData.dividedDiffBlocks[blockIdx + 1];
+
+      // subtract last line number of current block from first line number of next block to get the number of omitted lines
+      const omittedLinesCount = parseInt(nextFileDataBlock.rightLines[0].number) - parseInt(fileDataBlock.rightLines[fileDataBlock.rightLines.length - 1].number) - 1;
+
+      const blockDividerRow = document.createElement('tr');
+      const blockDividerCell = document.createElement('td');
+      blockDividerCell.innerHTML = `${omittedLinesCount} lines`;
+      blockDividerCell.style.backgroundColor = '#e4d9cb';
+      blockDividerCell.style.textAlign = 'center';
+      blockDividerCell.colSpan = 3; // span across entire table
+      blockDividerRow.appendChild(blockDividerCell);
+      diffDisplayTable.appendChild(blockDividerRow);
     }
   }
 
@@ -332,43 +379,92 @@ function displayChanges(comparison, changes) {
 }
 
 function prettifyDiffTable(diffTable) {
-  const comparison = extractDiff(diffTable);
-  const changes = computeDiff(comparison);
+  const processedFileData = extractDiff(diffTable);
 
-  displayChanges(comparison, changes);
+  // totalChanges is an array of block changes
+  const totalChanges = processedFileData.dividedDiffBlocks.map(computeDiff);
+
+  displayChanges(processedFileData, totalChanges);
 }
 
-function addPrettifyButtonsWhenReady() {
-  const HEADER_SELECTOR = '.filename-row a'
+// function addPrettifyButtonsWhenReady() {
+//   const HEADER_SELECTOR = '.filename-row a'
 
+//   const diffTables = document.querySelectorAll('.sidebyside');
+//   const allHeadersReady = Array.prototype.every.call(diffTables, table => !!table.querySelector(HEADER_SELECTOR));
+
+//   if (allHeadersReady) {
+//     for (const diffTable of diffTables) {
+//       // const header = diffTable.querySelector(HEADER_SELECTOR);
+
+//       const prettifyButton = document.createElement('button');
+//       prettifyButton.innerHTML = 'Prettify';
+//       prettifyButton.style.position = 'absolute';
+//       prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
+
+//       diffTable.appendChild(prettifyButton);
+//     }
+
+//     window.addEventListener('scroll', evt => {
+//       for (const diffTable of diffTables) {
+//         debugger;
+//       }
+//     })
+//   } else {
+//     setTimeout(() => {
+//       addPrettifyButtonsWhenReady();
+//     }, 200);
+//   }
+// }
+
+// // be reasonably sure that it's a review board page
+// if (
+//   document.querySelector('.reviewable-page') &&
+//   document.getElementById('content_container') &&
+//   document.getElementById('review-request') &&
+//   document.getElementById('diffs') &&
+//   document.querySelector('.diff-container') &&
+//   document.querySelector('.diff-box')
+// ) {
+//   addPrettifyButtonsWhenReady();
+// }
+
+
+window.addEventListener('scroll', evt => {
   const diffTables = document.querySelectorAll('.sidebyside');
-  const allHeadersReady = Array.prototype.every.call(diffTables, table => !!table.querySelector(HEADER_SELECTOR));
 
-  if (allHeadersReady) {
-    for (const diffTable of diffTables) {
-      const header = diffTable.querySelector(HEADER_SELECTOR);
-      const prettifyButton = document.createElement('button');
-      prettifyButton.innerHTML = 'Prettify';
-      prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
+  const windowHeight = window.innerHeight;
 
-      header.appendChild(prettifyButton);
+  for (let diffTableIdx = 0; diffTableIdx < diffTables.length; diffTableIdx++) {
+    const diffTable = diffTables[diffTableIdx];
+    const boundingRect = diffTable.getBoundingClientRect();
+
+    if (boundingRect.y < windowHeight - 100 && boundingRect.bottom > 0) {
+      console.log(diffTableIdx, boundingRect)
+      let prettifyButton = diffTable.querySelector('.prettify-button');
+      if (!prettifyButton) {
+        prettifyButton = document.createElement('button');
+        prettifyButton.className = 'prettify-button';
+        prettifyButton.style.position = 'absolute';
+        prettifyButton.style.left = '20px';
+        prettifyButton.style.width = '120px';
+        prettifyButton.style.height = '30px';
+        prettifyButton.style.borderRadius = '15px';
+        prettifyButton.style.fontSize = '15px';
+        prettifyButton.style.backgroundColor = '#0084bf';
+        prettifyButton.style.color = 'white';
+        prettifyButton.style.opacity = 0.6;
+        prettifyButton.style.outline = 'none';
+        prettifyButton.innerHTML = 'Prettify';
+        prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
+        diffTable.appendChild(prettifyButton);
+      }
+
+      if (boundingRect.bottom > windowHeight) {
+        prettifyButton.style.top = `${windowHeight - boundingRect.y - 45}px`;
+      } else {
+        prettifyButton.style.top = `${boundingRect.height - 45}px`;
+      }
     }
-  } else {
-    setTimeout(() => {
-      addPrettifyButtonsWhenReady();
-    }, 200);
   }
-}
-
-// be reasonably sure that it's a review board page
-if (
-  document.querySelector('.reviewable-page') &&
-  document.getElementById('content_container') &&
-  document.getElementById('review-request') &&
-  document.getElementById('diffs') &&
-  document.querySelector('.diff-container') &&
-  document.querySelector('.diff-box')
-) {
-  addPrettifyButtonsWhenReady();
-}
-
+})
