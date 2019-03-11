@@ -437,8 +437,8 @@ function prettifyDiffTable(diffTable) {
 // }
 
 
-window.addEventListener('scroll', evt => {
-  const diffTables = document.querySelectorAll('.sidebyside');
+window.addEventListener('scroll', () => {
+  const diffTables = document.querySelectorAll('.diff-box > .sidebyside');
 
   const windowHeight = window.innerHeight;
 
@@ -457,9 +457,12 @@ window.addEventListener('scroll', evt => {
         prettifyButton.style.height = '30px';
         prettifyButton.style.borderRadius = '15px';
         prettifyButton.style.fontSize = '15px';
-        prettifyButton.style.backgroundColor = '#0084bf';
-        prettifyButton.style.color = 'white';
+        prettifyButton.style.backgroundColor = 'white';
+        prettifyButton.style.color = '#0084bf';
         prettifyButton.style.outline = 'none';
+        prettifyButton.style.border = 'none';
+        prettifyButton.style.boxShadow = '0 0 6px #0084bf';
+        prettifyButton.style.cursor = 'pointer';
         prettifyButton.innerHTML = 'Prettify';
         prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
         diffTable.appendChild(prettifyButton);
@@ -468,17 +471,17 @@ window.addEventListener('scroll', evt => {
       prettifyButton.style.visibility = 'visible';
 
       if (boundingRect.bottom > windowHeight) {
-        // prettifyButton.style.top = `${windowHeight - boundingRect.y - 45}px`;
         prettifyButton.style.position = 'fixed';
         prettifyButton.style.bottom = '40px';
         prettifyButton.style.left = '-20px';
       } else {
-        // prettifyButton.style.top = `${boundingRect.height - 45}px`;
         prettifyButton.style.position = 'absolute';
         prettifyButton.style.left = '-36px';
       }
     } else {
-      prettifyButton.style.visibility = 'hidden';
+      if (prettifyButton) {
+        prettifyButton.style.visibility = 'hidden';
+      }
     }
   }
 })
