@@ -32,11 +32,8 @@ function extractDiff(diffTable) {
     rightLines: [],
   }
 
-  // const leftLines = [];
-  // const rightLines = [];
-
   for (const diffSection of diffTable.getElementsByTagName('tbody')) {
-    const sectionType = diffSection.className;
+    const sectionType = diffSection.className.split(' ')[0];
 
     if (sectionType === 'diff-header' && dividedDiffBlock.rightLines.length > 0) {
       dividedDiffBlocks.push(dividedDiffBlock);
@@ -101,8 +98,6 @@ function extractDiff(diffTable) {
   return {
     filename: diffTable.querySelector('.filename-row').textContent.replace(/[\s\n]/g, ''),
     dividedDiffBlocks
-    // left: leftLines,
-    // right: rightLines,
   };
 }
 
@@ -226,32 +221,6 @@ function computeDiff(fileComparison) {
       currLineIdx: beginningInsertionIdx,
     });
   }
-
-  // console.log(changes);
-
-  // for (let changeIdx = 0; changeIdx < changes.length; changeIdx++) {
-  //   const change = changes[changeIdx];
-  //   const nextChange = changes[changeIdx + 1];
-
-  //   switch (change.editType) {
-  //     case 'NO_CHANGE':
-  //       console.log(rightLines[change.currLineIdx]);
-  //       break;
-  //     case 'LINE_CHANGE':
-  //       console.log('-', leftLines[change.prevLineIdx]);
-  //       if (nextChange && nextChange.editType === 'LINE_CHANGE') {
-
-  //       }
-  //       console.log('+', rightLines[change.currLineIdx]);
-  //       break;
-  //     case 'INSERTION':
-  //       console.log('+', rightLines[change.currLineIdx]);
-  //       break;
-  //     case 'DELETION':
-  //       console.log('-', leftLines[change.prevLineIdx]);
-  //       break;
-  //   }
-  // }
 
   return changes;
 }
@@ -393,49 +362,6 @@ function prettifyDiffTable(diffTable) {
 
   displayChanges(processedFileData, totalChanges);
 }
-
-// function addPrettifyButtonsWhenReady() {
-//   const HEADER_SELECTOR = '.filename-row a'
-
-//   const diffTables = document.querySelectorAll('.sidebyside');
-//   const allHeadersReady = Array.prototype.every.call(diffTables, table => !!table.querySelector(HEADER_SELECTOR));
-
-//   if (allHeadersReady) {
-//     for (const diffTable of diffTables) {
-//       // const header = diffTable.querySelector(HEADER_SELECTOR);
-
-//       const prettifyButton = document.createElement('button');
-//       prettifyButton.innerHTML = 'Prettify';
-//       prettifyButton.style.position = 'absolute';
-//       prettifyButton.addEventListener('click', () => prettifyDiffTable(diffTable))
-
-//       diffTable.appendChild(prettifyButton);
-//     }
-
-//     window.addEventListener('scroll', evt => {
-//       for (const diffTable of diffTables) {
-//         debugger;
-//       }
-//     })
-//   } else {
-//     setTimeout(() => {
-//       addPrettifyButtonsWhenReady();
-//     }, 200);
-//   }
-// }
-
-// // be reasonably sure that it's a review board page
-// if (
-//   document.querySelector('.reviewable-page') &&
-//   document.getElementById('content_container') &&
-//   document.getElementById('review-request') &&
-//   document.getElementById('diffs') &&
-//   document.querySelector('.diff-container') &&
-//   document.querySelector('.diff-box')
-// ) {
-//   addPrettifyButtonsWhenReady();
-// }
-
 
 window.addEventListener('scroll', () => {
   const diffTables = document.querySelectorAll('.diff-box > .sidebyside');
